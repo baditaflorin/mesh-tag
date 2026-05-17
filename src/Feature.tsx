@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
 import {
   QRExchange,
+  Leaderboard,
   makeScanPayload,
+  useEventLog,
+  useNamedPeer,
   type MeshConfig,
   type YRoom,
+  type LeaderboardItem,
 } from "@baditaflorin/mesh-common";
+import { useEffect, useState } from "react";
 
 type Props = { room: YRoom | null; config: MeshConfig };
-type Tag = { from: string; to: string; ts: number };
-const NAME_KEY = (p: string) => `${p}:displayName`;
+type TagEvt = { peerId: string; from: string; to: string; ts: number };
 
 export function Feature({ room, config }: Props) {
   if (!room) {
@@ -23,65 +26,52 @@ export function Feature({ room, config }: Props) {
 }
 
 function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
-  const [name, setName] = useState(
-    () => localStorage.getItem(NAME_KEY(config.storagePrefix)) ?? "",
-  );
+  // primitives #1 + #3 + nameOf for the leaderboard
+  const { name, setName, nameOf } = useNamedPeer(config, room);
+  const log = useEventLog<TagEvt>(room, "log");
   const [, rerender] = useState(0);
 
   useEffect(() => {
-    if (name) localStorage.setItem(NAME_KEY(config.storagePrefix), name);
-  }, [name, config.storagePrefix]);
-
-  useEffect(() => {
-    const log = room.doc.getArray<Tag>("log");
     const state = room.doc.getMap<string>("state");
-    const names = room.doc.getMap<string>("names");
     const cb = () => rerender((n) => n + 1);
-    log.observe(cb);
     state.observe(cb);
-    names.observe(cb);
-    return () => {
-      log.unobserve(cb);
-      state.unobserve(cb);
-      names.unobserve(cb);
-    };
+    return () => state.unobserve(cb);
   }, [room]);
 
-  const log = room.doc.getArray<Tag>("log");
   const state = room.doc.getMap<string>("state");
-  const names = room.doc.getMap<string>("names");
-
-  useEffect(() => {
-    if (name.trim()) names.set(room.peerId, name.trim());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, room.peerId]);
-
   const itPeerId = state.get("it") ?? null;
-  const itName = itPeerId ? (names.get(itPeerId) ?? itPeerId.slice(0, 6)) : null;
+  const itName = itPeerId ? (nameOf(itPeerId) ?? itPeerId.slice(0, 6)) : null;
   const amIIt = itPeerId === room.peerId;
 
   const startGame = () => {
     state.set("it", room.peerId);
-    log.push([{ from: "", to: room.peerId, ts: Date.now() }]);
+    log.push({ peerId: room.peerId, from: "", to: room.peerId, ts: Date.now() });
   };
 
-  const tag = (otherId: string, otherName?: string) => {
+  const tag = (otherId: string) => {
     if (!amIIt || otherId === room.peerId) return;
-    if (otherName) names.set(otherId, otherName);
     room.doc.transact(() => {
       state.set("it", otherId);
-      log.push([{ from: room.peerId, to: otherId, ts: Date.now() }]);
+      log.push({ peerId: room.peerId, from: room.peerId, to: otherId, ts: Date.now() });
     });
   };
 
-  // Time-as-it per peer
-  const tagLog = log.toArray();
+  // Compute time-as-it from the event log
   const timeAsIt = new Map<string, number>();
-  for (let i = 0; i < tagLog.length; i++) {
-    const t = tagLog[i]!;
-    const nextTs = i + 1 < tagLog.length ? tagLog[i + 1]!.ts : Date.now();
+  const events = log.events;
+  for (let i = 0; i < events.length; i++) {
+    const t = events[i]!;
+    const nextTs = i + 1 < events.length ? events[i + 1]!.ts : Date.now();
     timeAsIt.set(t.to, (timeAsIt.get(t.to) ?? 0) + (nextTs - t.ts));
   }
+
+  const board: LeaderboardItem[] = Array.from(timeAsIt.entries())
+    .map(([peerId, ms]) => ({
+      id: peerId,
+      name: nameOf(peerId) ?? peerId.slice(0, 6),
+      score: Math.round(ms / 1000),
+    }))
+    .sort((a, b) => b.score - a.score);
 
   const myPayload = makeScanPayload(room.roomId, room.peerId, name.trim() || "anon");
 
@@ -90,8 +80,8 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
       <header>
         <h1>tag</h1>
         <p className="viral-status">
-          {itName ? `${itName} is IT` : "no one is it yet"} · {tagLog.length} tags ·{" "}
-          {room.peerCount + 1} present
+          {itName ? `${itName} is IT` : "no one is it yet"} · {log.size} tags · {room.peerCount + 1}{" "}
+          present
         </p>
       </header>
 
@@ -117,49 +107,35 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
         myPayload={myPayload}
         showLabel="your QR"
         scanLabel={amIIt ? "scan to tag" : "you can only tag when you are it"}
-        onScan={(parsed) => tag(parsed.peerId, parsed.extra ?? undefined)}
+        onScan={(parsed) => tag(parsed.peerId)}
+      />
+
+      <Leaderboard
+        title="time-as-it leaderboard"
+        items={board}
+        highlightId={room.peerId}
+        emptyText="no one has been it yet"
+        formatScore={(s) => `${s}s`}
       />
 
       <section>
-        <h2 className="viral-section-title">time-as-it leaderboard</h2>
-        {timeAsIt.size === 0 ? (
-          <p className="viral-empty">no one has been it yet</p>
-        ) : (
-          <ol className="tag-board">
-            {Array.from(timeAsIt.entries())
-              .sort((a, b) => b[1] - a[1])
-              .map(([peerId, ms]) => (
-                <li key={peerId} className={peerId === room.peerId ? "is-me" : ""}>
-                  <strong>{names.get(peerId) ?? peerId.slice(0, 6)}</strong>
-                  <span>{Math.round(ms / 1000)}s</span>
-                </li>
-              ))}
-          </ol>
-        )}
-      </section>
-
-      <section>
         <h2 className="viral-section-title">tag history</h2>
-        {tagLog.length === 0 ? (
+        {log.size === 0 ? (
           <p className="viral-empty">none</p>
         ) : (
           <ul className="tag-feed">
-            {tagLog
-              .slice()
-              .reverse()
-              .slice(0, 12)
-              .map((t, i) => (
-                <li key={i}>
-                  {t.from ? (
-                    <>
-                      <strong>{names.get(t.from) ?? t.from.slice(0, 6)}</strong> →{" "}
-                    </>
-                  ) : (
-                    "★ "
-                  )}
-                  <strong>{names.get(t.to) ?? t.to.slice(0, 6)}</strong> is it
-                </li>
-              ))}
+            {log.latest(12).map((t, i) => (
+              <li key={i}>
+                {t.from ? (
+                  <>
+                    <strong>{nameOf(t.from) ?? t.from.slice(0, 6)}</strong> →{" "}
+                  </>
+                ) : (
+                  "★ "
+                )}
+                <strong>{nameOf(t.to) ?? t.to.slice(0, 6)}</strong> is it
+              </li>
+            ))}
           </ul>
         )}
       </section>
