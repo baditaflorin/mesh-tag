@@ -1,7 +1,7 @@
 # mesh-tag
 
 [![pages](https://img.shields.io/badge/live-baditaflorin.github.io%2Fmesh-tag-f97316)](https://baditaflorin.github.io/mesh-tag/)
-[![version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/baditaflorin/mesh-tag/blob/main/package.json)
+[![version](https://img.shields.io/badge/version-0.1.1-blue)](https://github.com/baditaflorin/mesh-tag/blob/main/package.json)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 > You're it — playground tag, pass 'it' by scanning the next person's QR
