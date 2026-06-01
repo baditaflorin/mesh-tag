@@ -22,11 +22,15 @@
 
 A **rootless-computing** peer-to-peer browser app. No backend of its own beyond the self-hosted WebRTC stack listed below. State lives in a Yjs mesh shared by everyone in the same room.
 
+Playground tag for a room of phones: one person is "IT", and only IT can pass it on by scanning the next person's QR. Exactly one person holds "it" at any moment, and a shared leaderboard tracks who's spent the longest stuck as IT.
+
 Read the principles → **https://baditaflorin.github.io/rootless-computing/principles.html**
 
 ## Quickstart
 
-Open the live URL on two devices in the same room (set in ⚙ settings, or scan the room QR). Everything else is in-app.
+**Try it in 30 seconds:** open the live URL in two browser tabs. Type a name in each, hit **start — I'm it** in the first tab, then expand the second tab's QR, copy its payload into the first tab's "paste a payload" box, and hit **use**. "It" jumps to the second tab on both screens.
+
+In a real room: open the live URL on two devices in the same room (set in ⚙ settings, or scan the room QR). Everything else is in-app.
 
 For local hacking:
 
