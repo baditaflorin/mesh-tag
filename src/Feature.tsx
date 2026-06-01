@@ -86,6 +86,13 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
         </p>
       </header>
 
+      <p className="tag-help">
+        Playground tag for a room. One person is "IT"; only IT can pass it on by scanning the next
+        person's QR. The leaderboard tracks who's spent the longest stuck as IT.{" "}
+        <strong>Try it:</strong> open this page in two tabs, start as IT in one, then paste the
+        other tab's QR payload to tag them.
+      </p>
+
       <MeshNameInput
         className="viral-name"
         value={name}
@@ -122,7 +129,7 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
       <section>
         <h2 className="viral-section-title">tag history</h2>
         {log.size === 0 ? (
-          <p className="viral-empty">none</p>
+          <p className="viral-empty">no tags yet — start the game above</p>
         ) : (
           <ul className="tag-feed">
             {log.latest(12).map((t, i) => (

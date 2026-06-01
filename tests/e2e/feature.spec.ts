@@ -22,6 +22,9 @@ const storagePrefix = pkg.name;
 test("pass 'it' across the mesh: both peers agree, single holder", async ({ browser, baseURL }) => {
   const { a, b, cleanup } = await openTwoPeers(browser, baseURL ?? "", { storagePrefix });
   try {
+    // In-app help explains the rules + the 2-tab try-it path for newcomers.
+    await expect(a.locator(".tag-help")).toContainText("only IT can pass it");
+
     await a.getByPlaceholder("your name").fill("alice");
     await b.getByPlaceholder("your name").fill("bob");
     await a.getByRole("button", { name: /start — I'm it/ }).click();
